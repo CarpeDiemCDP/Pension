@@ -37,7 +37,7 @@ interface AuctionContractInterface {
     function dev_addr() external view returns (address);
 }
 
-contract Staking is Ownable, Initializable {
+contract Pension is Ownable, Initializable {
     uint256 public totalShares = 1;
     uint256 public auctionShares = 1;
     uint256 public totalCDPClaimed;
@@ -51,10 +51,10 @@ contract Staking is Ownable, Initializable {
 
     address swiss_addr;
    
-    // Info of each user that stakes tokens (CDPToken)
+    // Info of each user that locks tokens (CDPToken)
     struct UserInfo {
         address referral;
-        uint256 shares; // How many staked tokens the user has provided
+        uint256 shares; // How many tokens the user has provided
         uint256 lastInteraction; // last time user interacted
         uint256 lastUpdate; // last day user total shares was updated
         uint256 CDPCollected;
@@ -210,7 +210,7 @@ contract Staking is Ownable, Initializable {
         uint256 userShares = user.shares;
 
         if (snapshot < rewardPerShare) {
-            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0, not sure if this is the best way to write this or that another "if" is better
+            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
             user.snapshot = rewardPerShare; // takes a new snapshot for the user
             user.storedReward = 0; // delete stored reward
         }
@@ -289,7 +289,7 @@ contract Staking is Ownable, Initializable {
         uint256 userShares = user.shares;
 
         if (snapshot < rewardPerShare) {
-            totalPending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0, not sure if this is the best way to write this or that another "if" is better
+            totalPending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
         }
     }
 
@@ -311,7 +311,7 @@ contract Staking is Ownable, Initializable {
         uint256 userShares = user.shares;
 
         if (snapshot < rewardPerShare) {
-            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0, not sure if this is the best way to write this or that another "if" is better
+            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
             user.storedReward = 0; // delete stored reward
         }
 
