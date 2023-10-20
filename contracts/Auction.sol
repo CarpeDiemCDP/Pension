@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-interface StakingContractInterface {
+interface PensionContractInterface {
     function getauctionShares() external view returns (uint256);
 
     function mintCDP(
@@ -76,8 +76,8 @@ contract Auction is Ownable, Initializable {
     uint256 public totalPLSdeposited;
 
     /** TokenContract object  */
-    StakingContractInterface public _StakingContract;
-    address payable public StakingContractAddress;
+    PensionContractInterface public _PensionContract;
+    address payable public PensionContractAddress;
 
     constructor() {
         swiss_addr = msg.sender;
@@ -87,23 +87,24 @@ contract Auction is Ownable, Initializable {
 
     /** 
         @dev is called when we're ready to start the auction
-        @param _stakingaddress address of the staking contract
+        @param _pensionaddress address of the pension contract
 
     */
     function startAuction(
         address _CDP,
-        address _stakingaddress
+        address _pensionaddress
     ) external onlyOwner initializer {
         require(
-            _stakingaddress != address(0),
-            "Staking contract address cannot be zero"
+            _pensionaddress != address(0),
+            "Pension contract address cannot be zero"
         );
         CDP = _CDP;
         launchTime = block.timestamp;
         currentDay = calcDay();
-        StakingContractAddress = payable(_stakingaddress);
-        _StakingContract = StakingContractInterface(_stakingaddress);
+        PensionContractAddress = payable(_pensionaddress);
+        _PensionContract = PensionContractInterface(_pensionaddress);
 
+        renounceOwnership();
         emit AuctionStarted(block.timestamp);
     }
 
@@ -189,7 +190,7 @@ contract Auction is Ownable, Initializable {
         uint256 _sharesToPay = calcTokenValue(msg.sender, targetDay);
         mapUserAuctionEntry[msg.sender][targetDay].hasCollected = true;
 
-        StakingContractInterface(StakingContractAddress).mintShares(
+        PensionContractInterface(PensionContractAddress).mintShares(
             msg.sender,
             _sharesToPay
         );
@@ -238,33 +239,33 @@ contract Auction is Ownable, Initializable {
     }
 
     /**
-        @dev Mints CDP in Staking contract and shares for the day 
+        @dev Mints CDP in Pension contract and shares for the day 
         @param _day the day to mint the CDP + shares for
     */
     function _mintDailyCDPandShares(uint256 _day) internal {
-        // CDP is minted from Staking contract every day
+        // CDP is minted from Pension contract every day
         uint256 MintedCDP = todayMintedCDP();
         CDPMinted[_day] = MintedCDP;
-        StakingContractInterface(StakingContractAddress).mintCDP(
+        PensionContractInterface(PensionContractAddress).mintCDP(
             MintedCDP,
             _day
         );
 
-        // shares that belong to auction are burned as they are distributed in Staking to users
-        uint256 nextDayShares = StakingContractInterface(StakingContractAddress)
+        // shares that belong to auction are burned as they are distributed in Pension to users
+        uint256 nextDayShares = PensionContractInterface(PensionContractAddress)
             .BurnSharesfromAuction();
         shares[_day] = nextDayShares; // this is the amount of shares that are for sale on _day
     }
 
     /**
-        @dev Only mints CDP in Staking contract days that weren't updated
+        @dev Only mints CDP in Pension contract days that weren't updated
         @param _day the skipped day to mint the CDP
     */
     function _mintPastDailyCDP(uint256 _day) internal {
-        // CDP is minted from Staking from previous days
+        // CDP is minted from Pension from previous days
         uint256 MintedCDP = todayMintedCDP();
         CDPMinted[_day] = MintedCDP;
-        StakingContractInterface(StakingContractAddress).mintCDP(
+        PensionContractInterface(PensionContractAddress).mintCDP(
             MintedCDP,
             _day
         );
@@ -275,7 +276,7 @@ contract Auction is Ownable, Initializable {
      */
     function todayMintedCDP() public view returns (uint256) {
         uint256 totalSupply = IERC20(CDP).totalSupply();
-        uint256 totalShares = StakingContractInterface(StakingContractAddress)
+        uint256 totalShares = PensionContractInterface(PensionContractAddress)
             .gettotalShares();
         uint256 historicSupply = (totalShares * 10) / 13;
         return (((totalSupply + historicSupply) * 10000) / 103563452);

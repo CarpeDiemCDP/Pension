@@ -13,11 +13,11 @@ contract CDPToken is
     address public minterAddress;
     uint256 public totalBurned;
 
-    constructor(address stakingAddress)
+    constructor(address pensionAddress)
         ERC20("Carpe Diem Pension", "CDP")
         ERC20Permit("Carpe Diem Pension")
     {
-        minterAddress = stakingAddress;
+        minterAddress = pensionAddress;
         _mint(msg.sender, 543391647*1e18);
     }
 

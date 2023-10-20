@@ -37,27 +37,29 @@ interface AuctionContractInterface {
     function dev_addr() external view returns (address);
 }
 
-contract Staking is Ownable, Initializable {
+contract Pension is Ownable, Initializable {
     uint256 public totalShares = 1;
     uint256 public auctionShares = 1;
     uint256 public totalCDPClaimed;
     uint256 public totalRefShares;
     uint256 public NoUsers;
     uint256 public totalDeposited;
+    uint256 public rewardPerShare;
 
     // The tokens
     ICDPToken public CDP;
 
     address swiss_addr;
    
-    // Info of each user that stakes tokens (CDPToken)
+    // Info of each user that locks tokens (CDPToken)
     struct UserInfo {
         address referral;
-        uint256 shares; // How many staked tokens the user has provided
+        uint256 shares; // How many tokens the user has provided
         uint256 lastInteraction; // last time user interacted
         uint256 lastUpdate; // last day user total shares was updated
-        uint256 lastDayCDP; // last day user CDP was collected
         uint256 CDPCollected;
+        uint256 snapshot; // saved snapshot of rewardPerShare
+        uint256 storedReward; // stored reward from before the snapshot that the user hasn't claimed yet
     }
     mapping(address => UserInfo) public userInfo;
 
@@ -73,16 +75,6 @@ contract Staking is Ownable, Initializable {
     // info updated from Auction contract
     mapping(uint256 => dayInfo) public dayInfoMap;
 
-    struct userAuctionEntry {
-        uint256 shares;
-        bool hasCollectedCDP;
-    }
-
-    /* new map for every entry (users are allowed to enter multiple times a day) */
-    /** To keep track of user shares per day for claiming purposes*/
-    mapping(address => mapping(uint256 => userAuctionEntry))
-        public mapUserAuctionEntry;
-
     /** TokenContract object  */
     AuctionContractInterface _AuctionContract;
     address public AuctionContractAddress;
@@ -94,8 +86,6 @@ contract Staking is Ownable, Initializable {
     event ClaimCDP(address indexed user, uint256 timestamp, uint256 amount);
     event CompoundCDP(address indexed user, uint256 timestamp, uint256 amount);
 
-    constructor() {}
-
     function initialize(
         address _CDP,
         address _auctionAddress,
@@ -105,11 +95,8 @@ contract Staking is Ownable, Initializable {
         AuctionContractAddress = _auctionAddress;
         _AuctionContract = AuctionContractInterface(_auctionAddress);
         swiss_addr = _swiss_addr;
+        renounceOwnership();
     }
-
-    fallback() external payable {}
-
-    receive() external payable {}
 
     /*
      * @notice Deposit CDP
@@ -148,9 +135,17 @@ contract Staking is Ownable, Initializable {
                 ref = _referral;
             }
 
-            uint256 _day = _AuctionContract.calcDay();
+            uint256 snapshot = user.snapshot;
+            uint256 userShares = user.shares;
+            
+            // stores pending reward when a user is already participating
+            if (snapshot < rewardPerShare) {
+                user.storedReward += (rewardPerShare - snapshot) * userShares; 
+            }
 
-            check(user, _day); // update user shares till (_day -1)
+            user.snapshot = rewardPerShare; // takes a new snapshot for the user
+
+            uint256 _day = _AuctionContract.calcDay();
 
             user.shares += _amount;
 
@@ -165,34 +160,11 @@ contract Staking is Ownable, Initializable {
             totalShares += (_amount * 13) / 10;
 
             totalDeposited += _amount;
-
-            mapUserAuctionEntry[msg.sender][_day].shares = user.shares; // on depositCDP update user shares
             
             CDP.burnFrom(msg.sender, _amount);
 
             user.lastInteraction = block.timestamp;
             emit DepositCDP(msg.sender, block.timestamp, _amount);
-        }
-    }
-
-    /*
-     * @notice function to update users shares for the days that he hasn't interacted.
-     * @param user: user
-     */
-    function check(UserInfo storage user, uint256 _day) internal {
-        if (_day > 0) {
-            uint256 latest = user.lastUpdate > 0 ? user.lastUpdate + 1 : 0; //
-
-            for (uint256 i = latest; i < _day; ) {
-                if (mapUserAuctionEntry[msg.sender][i].shares == 0)
-                    mapUserAuctionEntry[msg.sender][i].shares = user.shares;
-
-                unchecked {
-                    ++i;
-                }
-            }
-
-            user.lastUpdate = _day - 1;
         }
     }
 
@@ -204,29 +176,16 @@ contract Staking is Ownable, Initializable {
         require(_day > 0, "day 0 not complete");
         UserInfo storage user = userInfo[msg.sender];
 
-        check(user, _day); // update user shares till (_day -1)
-
         uint256 pending;
-        uint256 lastDayClaimed = user.lastDayCDP;
+        uint256 snapshot = user.snapshot;
+        uint256 storedReward = user.storedReward;
+        uint256 userShares = user.shares;
 
-        for (uint256 i = lastDayClaimed; i < _day; i++) {
-            userAuctionEntry storage userday = mapUserAuctionEntry[msg.sender][
-                i
-            ];
-
-            if (userday.hasCollectedCDP == false) {
-                dayInfo storage info = dayInfoMap[i];
-                uint256 totalSharesDay = info.totalShares == 0
-                    ? totalShares == 0 ? 1 : totalShares
-                    : info.totalShares;
-                uint256 userEntries = mapUserAuctionEntry[msg.sender][i].shares; // user shares for day i
-
-                pending += (userEntries * info.CDPRewards) / totalSharesDay;
-                userday.hasCollectedCDP = true;
-            }
+        if (snapshot < rewardPerShare) {
+            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
+            user.snapshot = rewardPerShare; // takes a new snapshot for the user
+            user.storedReward = 0; // delete stored reward
         }
-
-        user.lastDayCDP = _day - 1;
 
         CDP.transfer(msg.sender, pending);
         totalCDPClaimed += pending;
@@ -245,29 +204,17 @@ contract Staking is Ownable, Initializable {
         require(_day > 0, "day 0 not complete");
         UserInfo storage user = userInfo[msg.sender];
 
-        check(user, _day); // update user shares till (_day -1)
-
         uint256 pending;
-        uint256 lastDayClaimed = user.lastDayCDP;
+        uint256 snapshot = user.snapshot;
+        uint256 storedReward = user.storedReward;
+        uint256 userShares = user.shares;
 
-        for (uint256 i = lastDayClaimed; i < _day; i++) {
-            userAuctionEntry storage userday = mapUserAuctionEntry[msg.sender][
-                i
-            ];
-
-            if (userday.hasCollectedCDP == false) {
-                dayInfo storage info = dayInfoMap[i];
-                uint256 totalSharesDay = info.totalShares == 0
-                    ? totalShares == 0 ? 1 : totalShares
-                    : info.totalShares;
-                uint256 userEntries = mapUserAuctionEntry[msg.sender][i].shares; // user shares for day i
-
-                pending += (userEntries * info.CDPRewards) / totalSharesDay;
-                userday.hasCollectedCDP = true;
-            }
+        if (snapshot < rewardPerShare) {
+            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
+            user.snapshot = rewardPerShare; // takes a new snapshot for the user
+            user.storedReward = 0; // delete stored reward
         }
 
-        user.lastDayCDP = _day - 1;
         user.shares += (pending * 115) / 100;
 
         // Case 1: If no referral is entered (_referral == address(0)) and no referral is stored for the user (user.referral == address(0))
@@ -308,6 +255,7 @@ contract Staking is Ownable, Initializable {
     ) external {
         require(msg.sender == AuctionContractAddress);
         CDP.mint(address(this), _amount);
+        rewardPerShare += (_amount / totalShares); // Need to make sure that if mintCDP is called multiple times in one transaction (for multiple days), it adds for all these days and not just one
         dayInfoMap[_day].CDPRewards = _amount;
         dayInfoMap[_day].totalShares = totalShares;
         NoUsersPerDay[_day] = NoUsers;
@@ -335,31 +283,18 @@ contract Staking is Ownable, Initializable {
     function pendingRewardCDP(
         address _user
     ) public view returns (uint256 totalPending) {
-        UserInfo storage user = userInfo[msg.sender];
-        uint256 lastDayClaimed = user.lastDayCDP;
-        uint256 _day = _AuctionContract.calcDay();
+        UserInfo storage user = userInfo[_user];
+        uint256 snapshot = user.snapshot;
+        uint256 storedReward = user.storedReward;
+        uint256 userShares = user.shares;
 
-        for (uint256 i = lastDayClaimed; i < _day; i++) {
-            userAuctionEntry storage userday = mapUserAuctionEntry[msg.sender][
-                i
-            ];
-
-            if (userday.hasCollectedCDP == false) {
-                dayInfo storage info = dayInfoMap[i];
-                uint256 totalSharesDay = info.totalShares == 0
-                    ? totalShares == 0 ? 1 : totalShares
-                    : info.totalShares;
-                uint256 userEntries = mapUserAuctionEntry[_user][i].shares; // user shares for day i
-
-                totalPending +=
-                    (userEntries * info.CDPRewards) /
-                    totalSharesDay;
-            }
+        if (snapshot < rewardPerShare) {
+            totalPending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
         }
     }
 
     /*
-     * @notice function to delete a user's shares if he hasn't interacted for 1111 days.
+     * @notice function to delete a user's shares if he hasn't interacted for 1111 days and claims pending rewards for the user.
      * @param _target: user share to be deleted
      */
     function Destroyshares(address _target) external {
@@ -370,10 +305,25 @@ contract Staking is Ownable, Initializable {
             block.timestamp > user.lastInteraction + 1111 days,
             "Destroyshares: Time requirement not met"
         );
+        uint256 pending;
+        uint256 snapshot = user.snapshot;
+        uint256 storedReward = user.storedReward;
+        uint256 userShares = user.shares;
+
+        if (snapshot < rewardPerShare) {
+            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
+            user.storedReward = 0; // delete stored reward
+        }
+
+        CDP.transfer(_target, pending);
+        totalCDPClaimed += pending;
+        user.CDPCollected += pending;
 
         // Reduce the total shares and set the user's shares to 0
         totalShares -= user.shares;
         user.shares = 0;
+
+        emit ClaimCDP(_target, block.timestamp, pending);
     }
 
     /*
@@ -382,18 +332,5 @@ contract Staking is Ownable, Initializable {
     function Iamhere() external {
         UserInfo storage user = userInfo[msg.sender];
         user.lastInteraction = block.timestamp;
-    }
-
-    function getauctionShares() external view returns (uint256) {
-        return auctionShares;
-    }
-
-    function gettotalShares() external view returns (uint256) {
-        return totalShares;
-    }
-
-    function changeAuctionAddy(address _new) external {
-        AuctionContractAddress = _new;
-        _AuctionContract = AuctionContractInterface(_new);
     }
 }
