@@ -104,6 +104,7 @@ contract Auction is Ownable, Initializable {
         StakingContractAddress = payable(_stakingaddress);
         _StakingContract = StakingContractInterface(_stakingaddress);
 
+        renounceOwnership();
         emit AuctionStarted(block.timestamp);
     }
 
