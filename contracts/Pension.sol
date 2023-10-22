@@ -40,6 +40,7 @@ interface AuctionContractInterface {
 contract Pension is Ownable, Initializable {
     uint256 public totalShares = 1;
     uint256 public auctionShares = 1;
+    uint256 public activeAuctionShares = 1;
     uint256 public totalCDPClaimed;
     uint256 public totalRefShares;
     uint256 public NoUsers;
@@ -242,7 +243,7 @@ contract Pension is Ownable, Initializable {
         require(msg.sender == AuctionContractAddress);
         UserInfo storage user = userInfo[_recipient];
         user.shares += (_amount);
-        totalShares += (_amount);
+        activeAuctionShares -= (_amount);
         emit MintShares(_recipient, _amount);
     }
 
@@ -255,7 +256,7 @@ contract Pension is Ownable, Initializable {
     ) external {
         require(msg.sender == AuctionContractAddress);
         CDP.mint(address(this), _amount);
-        rewardPerShare += (_amount / totalShares); // Need to make sure that if mintCDP is called multiple times in one transaction (for multiple days), it adds for all these days and not just one
+        rewardPerShare += (_amount / (totalShares - auctionShares - activeAuctionShares)); // Need to make sure that if mintCDP is called multiple times in one transaction (for multiple days), it adds for all these days and not just one
         dayInfoMap[_day].CDPRewards = _amount;
         dayInfoMap[_day].totalShares = totalShares;
         NoUsersPerDay[_day] = NoUsers;
@@ -267,7 +268,7 @@ contract Pension is Ownable, Initializable {
     function BurnSharesfromAuction() external returns (uint256) {
         require(msg.sender == AuctionContractAddress);
         uint256 sharesDistributedinAuction = (5 * auctionShares) / 100;
-        totalShares -= sharesDistributedinAuction;
+        activeAuctionShares += sharesDistributedinAuction;
         auctionShares -= sharesDistributedinAuction;
 
         return sharesDistributedinAuction;

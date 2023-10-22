@@ -22,7 +22,7 @@ contract CDPToken is
     }
 
     function mint(address to, uint256 amount) public {
-        require(msg.sender == minterAddress, "Account doesn't have the required permission");
+        require(msg.sender == minterAddress, "No permission");
         _mint(to, amount);
     }
 
