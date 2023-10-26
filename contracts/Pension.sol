@@ -76,7 +76,7 @@ contract Pension is Ownable, Initializable {
     // info updated from Auction contract
     mapping(uint256 => dayInfo) public dayInfoMap;
 
-    /** TokenContract object  */
+    /** TokenContract object */
     AuctionContractInterface _AuctionContract;
     address public AuctionContractAddress;
 
@@ -99,9 +99,9 @@ contract Pension is Ownable, Initializable {
         renounceOwnership();
     }
 
-    /*
+    /**
      * @notice Deposit CDP
-     * @param _amount: amount to withdraw (in CDPToken)
+     * @param _amount: amount to deposit (in CDPToken)
      */
     function depositCDP(
         uint256 _amount,
@@ -169,7 +169,7 @@ contract Pension is Ownable, Initializable {
         }
     }
 
-    /*
+    /**
      * @notice Claim CDP
      */
     function claimCDP() external {
@@ -183,7 +183,7 @@ contract Pension is Ownable, Initializable {
         uint256 userShares = user.shares;
 
         if (snapshot < rewardPerShare) {
-            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
+            pending += (rewardPerShare - snapshot) * userShares + storedReward;
             user.snapshot = rewardPerShare; // takes a new snapshot for the user
             user.storedReward = 0; // delete stored reward
         }
@@ -196,9 +196,9 @@ contract Pension is Ownable, Initializable {
         emit ClaimCDP(msg.sender, block.timestamp, pending);
     }
 
-    /*
+    /**
      * @notice Compound CDP
-     ** @param _day: day to Compound
+     * @param _day: day to Compound
      */
     function compoundCDP() external {
         uint256 _day = _AuctionContract.calcDay();
@@ -211,7 +211,7 @@ contract Pension is Ownable, Initializable {
         uint256 userShares = user.shares;
 
         if (snapshot < rewardPerShare) {
-            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
+            pending += (rewardPerShare - snapshot) * userShares + storedReward;
             user.snapshot = rewardPerShare; // takes a new snapshot for the user
             user.storedReward = 0; // delete stored reward
         }
@@ -256,7 +256,7 @@ contract Pension is Ownable, Initializable {
     ) external {
         require(msg.sender == AuctionContractAddress);
         CDP.mint(address(this), _amount);
-        rewardPerShare += (_amount / (totalShares - auctionShares - activeAuctionShares)); // Need to make sure that if mintCDP is called multiple times in one transaction (for multiple days), it adds for all these days and not just one
+        rewardPerShare += (_amount / (totalShares - auctionShares - activeAuctionShares));
         dayInfoMap[_day].CDPRewards = _amount;
         dayInfoMap[_day].totalShares = totalShares;
         NoUsersPerDay[_day] = NoUsers;
@@ -274,9 +274,8 @@ contract Pension is Ownable, Initializable {
         return sharesDistributedinAuction;
     }
 
-    /*
+    /**
      * @notice View function to see pending reward on frontend.
-     * @notice Pending are calculated as = user shares on that day / total shares on that day * total rewards
      * @param _user: user address
      * @param _day: day
      * @return Pending reward for a given user
@@ -294,8 +293,9 @@ contract Pension is Ownable, Initializable {
         }
     }
 
-    /*
-     * @notice function to delete a user's shares if he hasn't interacted for 1111 days and claims pending rewards for the user.
+    /**
+     * @notice function to delete a user's shares if he hasn't interacted for 1111 days.
+     * @notice Claims and sends pending rewards to the targetted user.
      * @param _target: user share to be deleted
      */
     function Destroyshares(address _target) external {
@@ -312,7 +312,7 @@ contract Pension is Ownable, Initializable {
         uint256 userShares = user.shares;
 
         if (snapshot < rewardPerShare) {
-            pending += (rewardPerShare - snapshot) * userShares + storedReward; // stored reward could be 0
+            pending += (rewardPerShare - snapshot) * userShares + storedReward;
             user.storedReward = 0; // delete stored reward
         }
 
@@ -327,11 +327,18 @@ contract Pension is Ownable, Initializable {
         emit ClaimCDP(_target, block.timestamp, pending);
     }
 
-    /*
+    /**
      * @notice function for a user to show presence.
      */
     function Iamhere() external {
         UserInfo storage user = userInfo[msg.sender];
         user.lastInteraction = block.timestamp;
+    }
+
+    /**
+     * @notice function to get the total number of shares in the system.
+     */
+    function gettotalShares() external view returns (uint256) {
+        return totalShares;
     }
 }

@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 interface PensionContractInterface {
-    function getauctionShares() external view returns (uint256);
-
     function mintCDP(
         uint256 _amount,
         uint256 _day
@@ -47,17 +45,17 @@ contract Auction is Ownable, Initializable {
     /** Taxes */
     address public swiss_addr;
 
-    /* Record the current day of the programme */
+    /** Record the current day of the program */
     uint256 public currentDay;
 
-    /* Auction participants data */
+    // Auction participants data
     struct userAuctionEntry {
         uint256 totalDepositsPLS;
         uint256 day;
         bool hasCollected;
     }
 
-    /* new map for every entry (users are allowed to enter multiple times a day) */
+    // new map for every entry (users are allowed to enter multiple times a day)
     mapping(address => mapping(uint256 => userAuctionEntry))
         public mapUserAuctionEntry;
 
@@ -75,7 +73,7 @@ contract Auction is Ownable, Initializable {
     address public CDP;
     uint256 public totalPLSdeposited;
 
-    /** TokenContract object  */
+    /** TokenContract object */
     PensionContractInterface public _PensionContract;
     address payable public PensionContractAddress;
 
@@ -86,10 +84,9 @@ contract Auction is Ownable, Initializable {
     receive() external payable {}
 
     /** 
-        @dev is called when we're ready to start the auction
-        @param _pensionaddress address of the pension contract
-
-    */
+     * @dev is called when we're ready to start the auction
+     * @param _pensionaddress address of the pension contract
+     */
     function startAuction(
         address _CDP,
         address _pensionaddress
@@ -109,19 +106,16 @@ contract Auction is Ownable, Initializable {
     }
 
     /**
-        @dev Calculate the current day based off the auction start time 
-    */
+     * @dev Calculate the current day based off the auction start time 
+     */
     function calcDay() public view returns (uint256) {
         if (launchTime == 0) return 0;
         return (block.timestamp - launchTime) / 20 hours;
     }
 
     /**
-        @dev Called daily, can be done manually in explorer but will be automated with a script
-        this prevent the first user transaction of the day having to pay all the gas to run this 
-        function. For security all tokens are kept in the token contract, divs are sent to the 
-        div contract for div rewards and taxs are sent to the tax contract.
-    */
+     * @dev Called daily, can be done manually in explorer. For security, all tokens are kept inside the contract.
+     */
     function doDailyUpdate() public {
         uint256 _nextDay = calcDay();
         uint256 _currentDay = currentDay;
@@ -174,7 +168,7 @@ contract Auction is Ownable, Initializable {
     }
 
     /**
-     * @dev External function for leaving the Auction / collecting the shares
+     * @dev External function for collecting shares from auction
      * @param targetDay Target day of Auction to collect
      */
     function collectAuctionShares(uint256 targetDay) external {
@@ -204,18 +198,17 @@ contract Auction is Ownable, Initializable {
     }
 
     /**
-     * @dev Calculating user's share from Auction based on their & of deposits for the day
+     * @dev Calculating user's share from Auction based on their deposits for the day
      * @param _Day The Auction day
      */
     function calcTokenValue(
         address _address,
         uint256 _Day
     ) public view returns (uint256 _tokenValue) {
-        //   require(_Day < calcDay(), "day must have ended");
         uint256 _entryDay = mapUserAuctionEntry[_address][_Day].day;
 
         if (shares[_entryDay] == 0) {
-            // No token minted for that day ( this happens when no deposits for the day)
+            // No token minted for that day (this happens when there are no deposits for the day)
             return 0;
         }
         if (_entryDay < currentDay) {
@@ -231,17 +224,17 @@ contract Auction is Ownable, Initializable {
     }
 
     /**
-        @dev Send PLS to swiss
-    */
+     * @dev Send PLS to swiss
+     */
     function withdrawPLS() external {
         uint256 _bal = address(this).balance;
-        payable(swiss_addr).transfer(_bal); // send PLS to swiss
+        payable(swiss_addr).transfer(_bal);
     }
 
     /**
-        @dev Mints CDP in Pension contract and shares for the day 
-        @param _day the day to mint the CDP + shares for
-    */
+     * @dev Mints CDP in Pension contract and shares for the day 
+     * @param _day the day to mint the CDP + shares for
+     */
     function _mintDailyCDPandShares(uint256 _day) internal {
         // CDP is minted from Pension contract every day
         uint256 MintedCDP = todayMintedCDP();
@@ -258,9 +251,9 @@ contract Auction is Ownable, Initializable {
     }
 
     /**
-        @dev Only mints CDP in Pension contract days that weren't updated
-        @param _day the skipped day to mint the CDP
-    */
+     * @dev Only mints CDP in Pension contract days that weren't updated
+     * @param _day the skipped day to mint the CDP
+     */
     function _mintPastDailyCDP(uint256 _day) internal {
         // CDP is minted from Pension from previous days
         uint256 MintedCDP = todayMintedCDP();
