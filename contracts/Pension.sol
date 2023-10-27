@@ -214,6 +214,7 @@ contract Pension is Ownable, Initializable {
         user.snapshot = rewardPerShare; // takes a new snapshot for the user
 
         user.shares += (_amount);
+        user.lastInteraction = block.timestamp;
         activeAuctionShares -= (_amount);
         emit MintShares(_recipient, _amount);
     }
