@@ -11,14 +11,10 @@ interface ICDPToken is IERC20 {
     function burnFrom(address account, uint256 amount) external;
 }
 
-interface AuctionContractInterface {
-    function calcDay() external view returns (uint256);
-}
-
 contract Pension is Ownable, Initializable {
     uint256 public totalShares = 1;
-    uint256 public auctionShares = 1;
-    uint256 public activeAuctionShares = 1;
+    uint256 public auctionShares;
+    uint256 public activeAuctionShares;
     uint256 public totalCDPClaimed;
     uint256 public totalRefShares;
     uint256 public NoUsers;
@@ -52,7 +48,6 @@ contract Pension is Ownable, Initializable {
     // info updated from Auction contract
     mapping(uint256 => dayInfo) public dayInfoMap;
 
-    AuctionContractInterface _AuctionContract;
     address public AuctionContractAddress;
 
     address[] public UsersInfo;
@@ -68,7 +63,6 @@ contract Pension is Ownable, Initializable {
     ) public onlyOwner initializer {
         CDP = ICDPToken(_CDP);
         AuctionContractAddress = _auctionAddress;
-        _AuctionContract = AuctionContractInterface(_auctionAddress);
         renounceOwnership();
     }
 
@@ -113,13 +107,11 @@ contract Pension is Ownable, Initializable {
             uint256 userShares = user.shares;
             
             // stores pending reward when a user is already participating
-            if (snapshot < rewardPerShare) {
+            if (userShares != 0) && (snapshot < rewardPerShare) {
                 user.storedReward += (rewardPerShare - snapshot) * userShares; 
             }
 
             user.snapshot = rewardPerShare; // takes a new snapshot for the user
-
-            uint256 _day = _AuctionContract.calcDay();
 
             user.shares += _amount;
 
@@ -146,8 +138,6 @@ contract Pension is Ownable, Initializable {
      * @notice Claim CDP
      */
     function claimCDP() external {
-        uint256 _day = _AuctionContract.calcDay();
-        require(_day > 0, "day 0 not complete");
         UserInfo storage user = userInfo[msg.sender];
 
         uint256 pending;
@@ -171,11 +161,8 @@ contract Pension is Ownable, Initializable {
 
     /**
      * @notice Compound CDP
-     * @param _day: day to Compound
      */
     function compoundCDP() external {
-        uint256 _day = _AuctionContract.calcDay();
-        require(_day > 0, "day 0 not complete");
         UserInfo storage user = userInfo[msg.sender];
 
         uint256 pending;
@@ -215,6 +202,17 @@ contract Pension is Ownable, Initializable {
     function mintShares(address _recipient, uint256 _amount) external {
         require(msg.sender == AuctionContractAddress);
         UserInfo storage user = userInfo[_recipient];
+
+        uint256 snapshot = user.snapshot;
+        uint256 userShares = user.shares;
+
+        // stores pending reward when a user is already participating
+        if (userShares != 0) && (snapshot < rewardPerShare) {
+            user.storedReward += (rewardPerShare - snapshot) * userShares; 
+        }
+
+        user.snapshot = rewardPerShare; // takes a new snapshot for the user
+
         user.shares += (_amount);
         activeAuctionShares -= (_amount);
         emit MintShares(_recipient, _amount);
@@ -250,7 +248,6 @@ contract Pension is Ownable, Initializable {
     /**
      * @notice View function to see pending reward on frontend.
      * @param _user: user address
-     * @param _day: day
      * @return Pending reward for a given user
      */
     function pendingRewardCDP(
