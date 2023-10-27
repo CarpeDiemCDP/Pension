@@ -13,28 +13,6 @@ interface ICDPToken is IERC20 {
 
 interface AuctionContractInterface {
     function calcDay() external view returns (uint256);
-
-    function lobbyEntry(uint256 _day) external view returns (uint256);
-
-    function balanceOf(address _owner) external view returns (uint256 balance);
-
-    function transfer(
-        address _to,
-        uint256 _value
-    ) external returns (bool success);
-
-    function allowance(
-        address owner,
-        address spender
-    ) external view returns (uint256);
-
-    function transferFrom(
-        address _from,
-        address _to,
-        uint256 _value
-    ) external returns (bool success);
-
-    function dev_addr() external view returns (address);
 }
 
 contract Pension is Ownable, Initializable {
@@ -74,7 +52,6 @@ contract Pension is Ownable, Initializable {
     // info updated from Auction contract
     mapping(uint256 => dayInfo) public dayInfoMap;
 
-    /** TokenContract object */
     AuctionContractInterface _AuctionContract;
     address public AuctionContractAddress;
 
