@@ -49,8 +49,6 @@ contract Pension is Ownable, Initializable {
 
     // The tokens
     ICDPToken public CDP;
-
-    address swiss_addr;
    
     // Info of each user that locks tokens (CDPToken)
     struct UserInfo {
@@ -89,13 +87,11 @@ contract Pension is Ownable, Initializable {
 
     function initialize(
         address _CDP,
-        address _auctionAddress,
-        address _swiss_addr
+        address _auctionAddress
     ) public onlyOwner initializer {
         CDP = ICDPToken(_CDP);
         AuctionContractAddress = _auctionAddress;
         _AuctionContract = AuctionContractInterface(_auctionAddress);
-        swiss_addr = _swiss_addr;
         renounceOwnership();
     }
 
