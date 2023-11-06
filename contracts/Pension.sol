@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.8;
+pragma solidity >=0.8.8;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -57,6 +57,8 @@ contract Pension is Ownable, Initializable {
     event ClaimCDP(address indexed user, uint256 timestamp, uint256 amount);
     event CompoundCDP(address indexed user, uint256 timestamp, uint256 amount);
 
+    constructor() Ownable(msg.sender) {}
+
     function initialize(
         address _CDP,
         address _auctionAddress
@@ -107,7 +109,7 @@ contract Pension is Ownable, Initializable {
             uint256 userShares = user.shares;
             
             // stores pending reward when a user is already participating
-            if (userShares != 0) && (snapshot < rewardPerShare) {
+            if (userShares != 0 && snapshot < rewardPerShare) {
                 user.storedReward += (rewardPerShare - snapshot) * userShares; 
             }
 
@@ -249,7 +251,7 @@ contract Pension is Ownable, Initializable {
     /**
      * @notice View function to see pending reward on frontend.
      * @param _user: user address
-     * @return Pending reward for a given user
+     * @return totalPending Pending reward for a given user
      */
     function pendingRewardCDP(
         address _user
