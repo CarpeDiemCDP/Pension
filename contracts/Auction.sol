@@ -407,6 +407,12 @@ contract Auction is Ownable, Initializable {
             uint256[] memory sharesDay
         )
     {
+        yourDeposits = new uint256[](numb);
+        totalDeposits = new uint256[](numb);
+        youReceives = new uint256[](numb);
+        claimedis = new bool[](numb);
+        sharesDay = new uint256[](numb);
+
         for (uint256 i = 0; i < numb; ) {
             yourDeposits[i] = mapUserAuctionEntry[account][_day + i]
                 .totalDepositsPLS;
@@ -418,6 +424,7 @@ contract Auction is Ownable, Initializable {
                 ++i;
             }
         }
+        
         return (yourDeposits, totalDeposits, youReceives, claimedis, sharesDay);
     }
 }
