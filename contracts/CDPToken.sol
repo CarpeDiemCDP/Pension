@@ -76,12 +76,4 @@ contract CDPToken is
         _spendAllowance(account, _msgSender(), amount);
         _burn(account, amount);
     }
-
-    /**
-     * @notice View function to see the total amount of destroyed tokens
-     * @return totalBurned Total amount of destroyed tokens
-     */
-    function getBurned() external view returns (uint256) {
-        return totalBurned;
-    }
 }
